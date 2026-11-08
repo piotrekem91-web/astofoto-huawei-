@@ -104,12 +104,17 @@ class MainActivity : Activity() {
         timeBar.progress = if (maxExposure <= minExposure) 0 else (1000 * ln(exposure.toDouble() / minExposure) / ln(maxExposure.toDouble() / minExposure)).toInt().coerceIn(0,1000)
     }
 
+    private fun cameraIdForDevice(): String = manager.cameraIdList.first { manager.getCameraCharacteristics(it).get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK }
+
     private fun startPreview() {
         val d = device ?: return
         val st = preview.surfaceTexture ?: return
         st.setDefaultBufferSize(1920,1080)
         val surface = Surface(st)
-        reader = ImageReader.newInstance(4000,3000,android.graphics.ImageFormat.JPEG,2)
+        val jpegSizes = manager.getCameraCharacteristics(cameraIdForDevice()).get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+            ?.getOutputSizes(android.graphics.ImageFormat.JPEG)
+        val jpegSize = jpegSizes?.maxByOrNull { it.width.toLong() * it.height } ?: Size(1920,1080)
+        reader = ImageReader.newInstance(jpegSize.width,jpegSize.height,android.graphics.ImageFormat.JPEG,2)
         reader!!.setOnImageAvailableListener({ r ->
             val image = r.acquireNextImage() ?: return@setOnImageAvailableListener
             val buffer = image.planes[0].buffer
