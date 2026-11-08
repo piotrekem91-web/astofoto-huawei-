@@ -116,6 +116,8 @@ class MainActivity : Activity() {
             rawButton.text = if (rawSupported) "RAW / DNG" else "RAW niedostępny"
             val caps = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: intArrayOf()
             manual = caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
+            isoBar.isEnabled = manual
+            timeBar.isEnabled = manual
             c.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)?.let { minIso = it.lower; maxIso = it.upper }
             c.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)?.let { minExposure = it.lower; maxExposure = min(it.upper, 30_000_000_000L) }
             minFocusDistance = c.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
