@@ -10,6 +10,7 @@ import android.media.ImageReader
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Size
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
@@ -55,6 +56,7 @@ class MainActivity : Activity() {
         timeBar = SeekBar(this).apply { max = 1000; progress = 300 }; panel.addView(timeBar)
         val row = LinearLayout(this)
         row.addView(Button(this).apply { text = "ZDJĘCIE"; setOnClickListener { shoot() } }, LinearLayout.LayoutParams(0, -2, 2f))
+        row.addView(Button(this).apply { text = "SERIA 10"; setOnClickListener { shootBurst(10) } }, LinearLayout.LayoutParams(0, -2, 1f))
         row.addView(Button(this).apply { text = "ISO 800 / 10 s"; setOnClickListener { iso = 800; exposure = 10_000_000_000L.coerceAtMost(maxExposure); sync(); applyPreview() } }, LinearLayout.LayoutParams(0, -2, 1f))
         panel.addView(row); root.addView(panel); setContentView(root)
         isoBar.setOnSeekBarChangeListener(changes { p -> iso = minIso + (maxIso - minIso) * p / 1000; isoText.text = "ISO: $iso"; applyPreview() })
@@ -159,6 +161,22 @@ class MainActivity : Activity() {
                 }
             }, null)
         } catch (e: Exception) { info.text = "Nie udało się wykonać zdjęcia: ${e.message}" }
+    }
+
+    private fun shootBurst(count: Int) {
+        val handler = android.os.Handler(mainLooper)
+        var remaining = count
+        info.text = "Seria: przygotowanie $count zdjęć"
+        fun next() {
+            if (remaining <= 0) {
+                info.text = "Seria zakończona • zapisano $count ujęć"
+                return
+            }
+            remaining--
+            shoot()
+            if (remaining > 0) handler.postDelayed({ next() }, 1200L)
+        }
+        next()
     }
 
     private fun save(data: ByteArray) {
