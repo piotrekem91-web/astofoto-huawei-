@@ -169,13 +169,28 @@ class MainActivity : Activity() {
         }, null)
         val outputs = mutableListOf(surface, reader!!.surface)
         rawReader?.surface?.let { outputs.add(it) }
+        configureCameraSession(d, surface, outputs, rawReader != null)
+    }
+
+    private fun configureCameraSession(d: CameraDevice, previewSurface: Surface, outputs: List<Surface>, retryWithoutRaw: Boolean) {
         d.createCaptureSession(outputs, object : CameraCaptureSession.StateCallback() {
             override fun onConfigured(s: CameraCaptureSession) {
                 session = s
-                request = d.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply { addTarget(surface) }
+                request = d.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply { addTarget(previewSurface) }
                 applyPreview()
             }
-            override fun onConfigureFailed(s: CameraCaptureSession) { info.text = "Błąd konfiguracji podglądu" }
+            override fun onConfigureFailed(s: CameraCaptureSession) {
+                if (retryWithoutRaw && rawReader != null) {
+                    rawReader?.close()
+                    rawReader = null
+                    rawSupported = false
+                    rawButton.isEnabled = false
+                    rawButton.text = "RAW niedostępny"
+                    configureCameraSession(d, previewSurface, listOf(previewSurface, reader!!.surface), false)
+                } else {
+                    info.text = "Błąd konfiguracji podglądu"
+                }
+            }
         }, null)
     }
 
