@@ -9,8 +9,8 @@ android {
         applicationId = "pl.astropro.p40"
         minSdk = 29
         targetSdk = 29
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
