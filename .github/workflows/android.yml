@@ -33,6 +33,9 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Show build toolchain
+        run: gradle --version
+
       - name: Compile and package
         run: gradle --no-daemon clean assembleDebug
 
