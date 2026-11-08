@@ -10,6 +10,7 @@ Natywna aplikacja Android dla Huawei P40 Pro / EMUI, bez zależności od Google 
 - Seria 10 zdjęć; odstęp jest wydłużany automatycznie przy długich ekspozycjach (sekwencja plików, bez wyrównywania i stackingu)
 - Preset nocny ISO 800 / do 10 s, ograniczany do zakresu zgłoszonego przez aparat
 - Ręczna ostrość i ustawienie nieskończoności, jeśli moduł aparatu zgłasza obsługę ręcznego focusu
+- Opcjonalne zdjęcia RAW/DNG przez Camera2, jeśli wybrany moduł udostępnia RAW_SENSOR; przy braku wsparcia przycisk RAW jest wyłączony
 - Nazwy zdjęć z dokładnością do milisekund
 - GitHub Actions: budowanie debug APK po zmianie kodu
 
@@ -18,4 +19,4 @@ Wymagane JDK 17, Android SDK i Gradle 8.9 (Android Gradle Plugin 8.7.3). W Andro
 Po udanym przebiegu GitHub Actions plik `app-debug.apk` będzie w artefakcie `AstroProP40-debug`.
 
 ## Ważne ograniczenia
-To prototyp aparatu, nie gotowa, przetestowana aplikacja astrofotograficzna. Nie ma jeszcze RAW/DNG, wyrównywania gwiazd ani stackowania, kalibracji dark/flat/bias ani edytora. Seria 10 ujęć automatyzuje kolejne zdjęcia, ale nie łączy ich w jeden obraz. Limity i dostępność ekspozycji zależą od Camera2 oraz firmware Huawei. Przed dystrybucją trzeba zbudować APK i sprawdzić działanie na fizycznym P40 Pro.
+To prototyp aparatu, nie gotowa, przetestowana aplikacja astrofotograficzna. Nie ma jeszcze wyrównywania gwiazd ani stackowania, kalibracji dark/flat/bias ani edytora. Seria 10 ujęć automatyzuje kolejne zdjęcia, ale nie łączy ich w jeden obraz. RAW/DNG zależy od możliwości konkretnego aparatu i wymaga testu na urządzeniu. Limity i dostępność ekspozycji zależą od Camera2 oraz firmware Huawei. Przed dystrybucją trzeba zbudować APK i sprawdzić działanie na fizycznym P40 Pro.
