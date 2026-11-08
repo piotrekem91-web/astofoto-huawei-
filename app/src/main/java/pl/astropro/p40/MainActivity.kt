@@ -40,7 +40,7 @@ class MainActivity : Activity() {
     private var iso = 800
     private var minIso = 50
     private var maxIso = 3200
-    private var exposure = 10_000_000L
+    private var exposure = 10_000_000_000L
     private var minExposure = 100_000L
     private var maxExposure = 30_000_000_000L
     private var manual = false
@@ -197,7 +197,11 @@ class MainActivity : Activity() {
             }
             remaining--
             shoot()
-            if (remaining > 0) handler.postDelayed({ next() }, 1200L)
+            if (remaining > 0) {
+                // Give the sensor time to finish the current long exposure before queuing the next frame.
+                val waitMs = maxOf(1200L, exposure / 1_000_000L + 1000L)
+                handler.postDelayed({ next() }, waitMs)
+            }
         }
         next()
     }
