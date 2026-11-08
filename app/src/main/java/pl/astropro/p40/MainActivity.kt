@@ -28,6 +28,11 @@ class MainActivity : Activity() {
     private lateinit var timeText: TextView
     private lateinit var isoBar: SeekBar
     private lateinit var timeBar: SeekBar
+    private lateinit var focusText: TextView
+    private lateinit var focusBar: SeekBar
+    private var minFocusDistance = 0f
+    private var focusDistance = 0f
+    private var manualFocusSupported = false
     private var device: CameraDevice? = null
     private var session: CameraCaptureSession? = null
     private var reader: ImageReader? = null
@@ -54,6 +59,8 @@ class MainActivity : Activity() {
         isoBar = SeekBar(this).apply { max = 1000; progress = 200 }; panel.addView(isoBar)
         timeText = text("Ekspozycja: 1/100 s"); panel.addView(timeText)
         timeBar = SeekBar(this).apply { max = 1000; progress = 300 }; panel.addView(timeBar)
+        focusText = text("Ostrość: automatyczna"); panel.addView(focusText)
+        focusBar = SeekBar(this).apply { max = 1000; progress = 1000; isEnabled = false }; panel.addView(focusBar)
         val row = LinearLayout(this)
         row.addView(Button(this).apply { text = "ZDJĘCIE"; setOnClickListener { shoot() } }, LinearLayout.LayoutParams(0, -2, 2f))
         row.addView(Button(this).apply { text = "SERIA 10"; setOnClickListener { shootBurst(10) } }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -63,6 +70,11 @@ class MainActivity : Activity() {
         timeBar.setOnSeekBarChangeListener(changes { p ->
             exposure = (minExposure * Math.pow(maxExposure.toDouble() / minExposure, p / 1000.0)).toLong()
             timeText.text = "Ekspozycja: ${formatTime(exposure)}"; applyPreview()
+        })
+        focusBar.setOnSeekBarChangeListener(changes { p ->
+            focusDistance = minFocusDistance * (1000 - p) / 1000f
+            focusText.text = if (p >= 995) "Ostrość: nieskończoność" else "Ostrość ręczna: %.2f D".format(Locale.US, focusDistance)
+            applyPreview()
         })
         preview.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) { openCamera() }
@@ -90,6 +102,11 @@ class MainActivity : Activity() {
             manual = caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
             c.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)?.let { minIso = it.lower; maxIso = it.upper }
             c.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)?.let { minExposure = it.lower; maxExposure = min(it.upper, 30_000_000_000L) }
+            minFocusDistance = c.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
+            manualFocusSupported = minFocusDistance > 0f
+            focusBar.isEnabled = manualFocusSupported
+            focusDistance = 0f
+            focusText.text = if (manualFocusSupported) "Ostrość: nieskończoność" else "Ostrość: sterowanie niedostępne"
             iso = 800.coerceIn(minIso, maxIso); exposure = 10_000_000_000L.coerceIn(minExposure, maxExposure); sync()
             manager.openCamera(id, object : CameraDevice.StateCallback() {
                 override fun onOpened(d: CameraDevice) { device = d; startPreview() }
@@ -133,6 +150,12 @@ class MainActivity : Activity() {
     }
 
     private fun manualSettings(b: CaptureRequest.Builder) {
+        if (manualFocusSupported) {
+            b.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
+            b.set(CaptureRequest.LENS_FOCUS_DISTANCE, focusDistance)
+        } else {
+            b.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+        }
         if (manual) {
             b.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_OFF)
             b.set(CaptureRequest.SENSOR_SENSITIVITY, iso)
@@ -181,7 +204,7 @@ class MainActivity : Activity() {
 
     private fun save(data: ByteArray) {
         try {
-            val name = "ASTRO_${SimpleDateFormat("yyyyMMdd_HHmmss",Locale.US).format(Date())}.jpg"
+            val name = "ASTRO_${SimpleDateFormat("yyyyMMdd_HHmmss_SSS",Locale.US).format(Date())}.jpg"
             val values = ContentValues().apply {
                 put(MediaStore.Images.Media.DISPLAY_NAME,name); put(MediaStore.Images.Media.MIME_TYPE,"image/jpeg")
                 put(MediaStore.Images.Media.RELATIVE_PATH,Environment.DIRECTORY_PICTURES + "/AstroProP40")
