@@ -2,7 +2,7 @@
 
 Natywna aplikacja Android dla Huawei P40 Pro / EMUI, bez zależności od Google Mobile Services.
 
-## Aktualny prototyp 0.1
+## Aktualny prototyp 0.2.0
 - Podgląd aparatu przez Camera2
 - Ręczne ISO i czas ekspozycji, jeśli firmware danego modułu udostępnia sterowanie manualne
 - Dobór rozmiaru JPEG z rozmiarów zgłoszonych przez aparat
@@ -10,7 +10,7 @@ Natywna aplikacja Android dla Huawei P40 Pro / EMUI, bez zależności od Google 
 - Seria 10 zdjęć; odstęp jest wydłużany automatycznie przy długich ekspozycjach (sekwencja plików, bez wyrównywania i stackingu)
 - Preset nocny ISO 800 / do 10 s, ograniczany do zakresu zgłoszonego przez aparat
 - Ręczna ostrość i ustawienie nieskończoności, jeśli moduł aparatu zgłasza obsługę ręcznego focusu
-- Opcjonalne zdjęcia RAW/DNG przez Camera2, jeśli wybrany moduł udostępnia RAW_SENSOR; przy braku wsparcia przycisk RAW jest wyłączony
+- Opcjonalne zdjęcia RAW/DNG przez Camera2, jeśli wybrany moduł udostępnia RAW_SENSOR; jeśli kombinacja strumieni RAW/JPEG nie zadziała, aplikacja wraca do podglądu JPEG
 - Nazwy zdjęć z dokładnością do milisekund
 - GitHub Actions: budowanie debug APK po zmianie kodu
 
