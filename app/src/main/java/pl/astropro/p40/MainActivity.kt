@@ -203,9 +203,11 @@ class MainActivity : Activity() {
             b.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
         }
         if (manual) {
-            b.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_OFF)
-            b.set(CaptureRequest.SENSOR_SENSITIVITY, iso)
-            b.set(CaptureRequest.SENSOR_EXPOSURE_TIME, exposure)
+            // Manual ISO and shutter require AE to be explicitly disabled.
+            b.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+            b.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+            b.set(CaptureRequest.SENSOR_SENSITIVITY, iso.coerceIn(minIso, maxIso))
+            b.set(CaptureRequest.SENSOR_EXPOSURE_TIME, exposure.coerceIn(minExposure, maxExposure))
         } else {
             b.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
             b.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
