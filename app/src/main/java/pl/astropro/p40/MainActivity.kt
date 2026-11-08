@@ -180,6 +180,7 @@ class MainActivity : Activity() {
                 applyPreview()
             }
             override fun onConfigureFailed(s: CameraCaptureSession) {
+                s.close()
                 if (retryWithoutRaw && rawReader != null) {
                     rawReader?.close()
                     rawReader = null
@@ -321,6 +322,11 @@ class MainActivity : Activity() {
         super.onRequestPermissionsResult(code,permissions,results)
         if (code == 7 && results.firstOrNull() == PackageManager.PERMISSION_GRANTED) preview.post { openCamera() }
         else info.text = "Aplikacja wymaga dostępu do aparatu"
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::preview.isInitialized && preview.isAvailable) preview.post { openCamera() }
     }
 
     override fun onPause() {
