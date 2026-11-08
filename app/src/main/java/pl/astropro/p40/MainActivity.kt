@@ -207,6 +207,7 @@ class MainActivity : Activity() {
         val s = session ?: return
         val out = rawReader ?: return
         if (!rawSupported) return
+        rawButton.isEnabled = false
         try {
             pendingRawImage?.close(); pendingRawImage = null; pendingRawResult = null
             val b = d.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE).apply {
@@ -220,7 +221,7 @@ class MainActivity : Activity() {
                 }
             }, null)
             info.text = "RAW: wykonywanie ekspozycji…"
-        } catch (e: Exception) { info.text = "Błąd RAW: ${e.message}" }
+        } catch (e: Exception) { rawButton.isEnabled = rawSupported; info.text = "Błąd RAW: ${e.message}" }
     }
 
     private fun writePendingDng() {
@@ -238,11 +239,15 @@ class MainActivity : Activity() {
             }
             val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
                 ?: throw IllegalStateException("Nie można utworzyć pliku DNG")
-            contentResolver.openOutputStream(uri)?.use { stream -> DngCreator(chars, result).use { it.writeImage(stream, image) } }
+            val output = contentResolver.openOutputStream(uri) ?: throw IllegalStateException("Nie można otworzyć pliku DNG")
+            output.use { stream -> DngCreator(chars, result).use { it.writeImage(stream, image) } }
             runOnUiThread { info.text = "Zapisano RAW / DNG w Pictures/AstroProP40" }
         } catch (e: Exception) {
             runOnUiThread { info.text = "Zapis DNG nieudany: ${e.message}" }
-        } finally { image.close() }
+        } finally {
+            image.close()
+            runOnUiThread { rawButton.isEnabled = rawSupported }
+        }
     }
 
     private fun shoot() {
