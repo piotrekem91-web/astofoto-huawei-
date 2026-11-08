@@ -6,6 +6,8 @@ import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.*
+import android.hardware.camera2.DngCreator
+import android.media.Image
 import android.media.ImageReader
 import android.os.Bundle
 import android.os.Environment
@@ -30,12 +32,18 @@ class MainActivity : Activity() {
     private lateinit var timeBar: SeekBar
     private lateinit var focusText: TextView
     private lateinit var focusBar: SeekBar
+    private lateinit var rawButton: Button
     private var minFocusDistance = 0f
     private var focusDistance = 0f
     private var manualFocusSupported = false
     private var device: CameraDevice? = null
     private var session: CameraCaptureSession? = null
     private var reader: ImageReader? = null
+    private var rawReader: ImageReader? = null
+    private var cameraCharacteristics: CameraCharacteristics? = null
+    private var rawSupported = false
+    private var pendingRawImage: Image? = null
+    private var pendingRawResult: TotalCaptureResult? = null
     private var request: CaptureRequest.Builder? = null
     private var iso = 800
     private var minIso = 50
@@ -63,6 +71,8 @@ class MainActivity : Activity() {
         focusBar = SeekBar(this).apply { max = 1000; progress = 1000; isEnabled = false }; panel.addView(focusBar)
         val row = LinearLayout(this)
         row.addView(Button(this).apply { text = "ZDJĘCIE"; setOnClickListener { shoot() } }, LinearLayout.LayoutParams(0, -2, 2f))
+        rawButton = Button(this).apply { text = "RAW / DNG"; isEnabled = false; setOnClickListener { shootRaw() } }
+        row.addView(rawButton, LinearLayout.LayoutParams(0, -2, 1f))
         row.addView(Button(this).apply { text = "SERIA 10"; setOnClickListener { shootBurst(10) } }, LinearLayout.LayoutParams(0, -2, 1f))
         row.addView(Button(this).apply { text = "ISO 800 / 10 s"; setOnClickListener { iso = 800; exposure = 10_000_000_000L.coerceAtMost(maxExposure); sync(); applyPreview() } }, LinearLayout.LayoutParams(0, -2, 1f))
         panel.addView(row); root.addView(panel); setContentView(root)
@@ -98,6 +108,12 @@ class MainActivity : Activity() {
         try {
             val id = manager.cameraIdList.first { manager.getCameraCharacteristics(it).get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK }
             val c = manager.getCameraCharacteristics(id)
+            cameraCharacteristics = c
+            val streamMap = c.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+            rawSupported = (c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: intArrayOf()).contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW) &&
+                !streamMap?.getOutputSizes(android.graphics.ImageFormat.RAW_SENSOR).isNullOrEmpty()
+            rawButton.isEnabled = rawSupported
+            rawButton.text = if (rawSupported) "RAW / DNG" else "RAW niedostępny"
             val caps = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: intArrayOf()
             manual = caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
             c.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)?.let { minIso = it.lower; maxIso = it.upper }
@@ -134,12 +150,26 @@ class MainActivity : Activity() {
             ?.getOutputSizes(android.graphics.ImageFormat.JPEG)
         val jpegSize = jpegSizes?.maxByOrNull { it.width.toLong() * it.height } ?: Size(1920,1080)
         reader = ImageReader.newInstance(jpegSize.width,jpegSize.height,android.graphics.ImageFormat.JPEG,2)
+        if (rawSupported) {
+            val rawSize = manager.getCameraCharacteristics(cameraIdForDevice()).get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
+                .getOutputSizes(android.graphics.ImageFormat.RAW_SENSOR).maxByOrNull { it.width.toLong() * it.height }
+            if (rawSize != null) {
+                rawReader = ImageReader.newInstance(rawSize.width, rawSize.height, android.graphics.ImageFormat.RAW_SENSOR, 2)
+                rawReader!!.setOnImageAvailableListener({ r ->
+                    pendingRawImage?.close()
+                    pendingRawImage = r.acquireNextImage()
+                    writePendingDng()
+                }, null)
+            }
+        }
         reader!!.setOnImageAvailableListener({ r ->
             val image = r.acquireNextImage() ?: return@setOnImageAvailableListener
             val buffer = image.planes[0].buffer
             val data = ByteArray(buffer.remaining()); buffer.get(data); image.close(); save(data)
         }, null)
-        d.createCaptureSession(listOf(surface,reader!!.surface), object : CameraCaptureSession.StateCallback() {
+        val outputs = mutableListOf(surface, reader!!.surface)
+        rawReader?.surface?.let { outputs.add(it) }
+        d.createCaptureSession(outputs, object : CameraCaptureSession.StateCallback() {
             override fun onConfigured(s: CameraCaptureSession) {
                 session = s
                 request = d.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply { addTarget(surface) }
@@ -170,6 +200,49 @@ class MainActivity : Activity() {
         val s = session ?: return
         val b = request ?: return
         try { manualSettings(b); s.setRepeatingRequest(b.build(), null, null) } catch (_: Exception) {}
+    }
+
+    private fun shootRaw() {
+        val d = device ?: return
+        val s = session ?: return
+        val out = rawReader ?: return
+        if (!rawSupported) return
+        try {
+            pendingRawImage?.close(); pendingRawImage = null; pendingRawResult = null
+            val b = d.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE).apply {
+                addTarget(out.surface)
+                manualSettings(this)
+            }
+            s.capture(b.build(), object : CameraCaptureSession.CaptureCallback() {
+                override fun onCaptureCompleted(session: CameraCaptureSession, request: CaptureRequest, result: TotalCaptureResult) {
+                    pendingRawResult = result
+                    writePendingDng()
+                }
+            }, null)
+            info.text = "RAW: wykonywanie ekspozycji…"
+        } catch (e: Exception) { info.text = "Błąd RAW: ${e.message}" }
+    }
+
+    private fun writePendingDng() {
+        val image = pendingRawImage ?: return
+        val result = pendingRawResult ?: return
+        val chars = cameraCharacteristics ?: return
+        pendingRawImage = null
+        pendingRawResult = null
+        try {
+            val name = "ASTRO_${SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())}.dng"
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/x-adobe-dng")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/AstroProP40")
+            }
+            val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("Nie można utworzyć pliku DNG")
+            contentResolver.openOutputStream(uri)?.use { stream -> DngCreator(chars, result).use { it.writeImage(stream, image) } }
+            runOnUiThread { info.text = "Zapisano RAW / DNG w Pictures/AstroProP40" }
+        } catch (e: Exception) {
+            runOnUiThread { info.text = "Zapis DNG nieudany: ${e.message}" }
+        } finally { image.close() }
     }
 
     private fun shoot() {
@@ -230,5 +303,12 @@ class MainActivity : Activity() {
         else info.text = "Aplikacja wymaga dostępu do aparatu"
     }
 
-    override fun onPause() { super.onPause(); session?.close(); session = null; device?.close(); device = null; reader?.close(); reader = null }
+    override fun onPause() {
+        super.onPause()
+        session?.close(); session = null
+        device?.close(); device = null
+        reader?.close(); reader = null
+        rawReader?.close(); rawReader = null
+        pendingRawImage?.close(); pendingRawImage = null; pendingRawResult = null
+    }
 }
